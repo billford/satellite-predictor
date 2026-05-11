@@ -4,6 +4,8 @@ Local Satellite Pass Predictor — Chagrin Falls, OH
 Fetches TLE data from Celestrak and predicts satellite passes using skyfield.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys
