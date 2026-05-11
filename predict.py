@@ -104,8 +104,9 @@ def fetch_tle(norad: int, force: bool = False) -> tuple[str, str, str]:
 # ── Pass prediction ───────────────────────────────────────────────────────────
 
 def predict_passes(sat_cfg: dict, days_ahead: int, min_elevation: float,
-                   force_refresh: bool = False) -> list[dict]:  # pylint: disable=too-many-locals
+                   force_refresh: bool = False) -> list[dict]:
     """Return a list of pass dicts for sat_cfg over the next days_ahead days."""
+    # pylint: disable=too-many-locals
     name_cfg = sat_cfg["name"]
     norad    = sat_cfg["norad"]
     freq     = sat_cfg["freq_mhz"]
