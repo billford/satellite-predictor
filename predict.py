@@ -6,7 +6,6 @@ Fetches TLE data from Celestrak and predicts satellite passes using skyfield.
 
 import argparse
 import json
-import os
 import sys
 import subprocess
 from datetime import datetime, timezone, timedelta
@@ -15,8 +14,6 @@ from pathlib import Path
 import requests
 from skyfield.api import load, wgs84, EarthSatellite
 from rich.console import Console
-from rich.table import Table
-from rich import box
 from rich.rule import Rule
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -49,6 +46,7 @@ console = Console()
 # ── Azimuth helpers ───────────────────────────────────────────────────────────
 
 def degrees_to_cardinal(deg: float) -> str:
+    """Convert an azimuth in degrees to a 16-point compass direction string."""
     dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
             "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
     ix = round(deg / 22.5) % 16
@@ -58,10 +56,12 @@ def degrees_to_cardinal(deg: float) -> str:
 # ── TLE cache ─────────────────────────────────────────────────────────────────
 
 def tle_cache_path(norad: int) -> Path:
+    """Return the filesystem path for a cached TLE file by NORAD ID."""
     return TLE_CACHE_DIR / f"{norad}.tle"
 
 
 def tle_is_fresh(norad: int) -> bool:
+    """Return True if the cached TLE for norad exists and is younger than TLE_MAX_AGE_HOURS."""
     path = tle_cache_path(norad)
     if not path.exists():
         return False
@@ -104,7 +104,8 @@ def fetch_tle(norad: int, force: bool = False) -> tuple[str, str, str]:
 # ── Pass prediction ───────────────────────────────────────────────────────────
 
 def predict_passes(sat_cfg: dict, days_ahead: int, min_elevation: float,
-                   force_refresh: bool = False) -> list[dict]:
+                   force_refresh: bool = False) -> list[dict]:  # pylint: disable=too-many-locals
+    """Return a list of pass dicts for sat_cfg over the next days_ahead days."""
     name_cfg = sat_cfg["name"]
     norad    = sat_cfg["norad"]
     freq     = sat_cfg["freq_mhz"]
@@ -163,11 +164,14 @@ def predict_passes(sat_cfg: dict, days_ahead: int, min_elevation: float,
 # ── Output formatters ─────────────────────────────────────────────────────────
 
 def format_duration(seconds: int) -> str:
+    """Format a duration in seconds as a human-readable string like '4m 32s'."""
     m, s = divmod(seconds, 60)
     return f"{m}m {s:02d}s"
 
 
-def print_terminal(all_passes: list[dict], min_elevation: float) -> None:
+def print_terminal(  # pylint: disable=too-many-locals
+        all_passes: list[dict], min_elevation: float) -> None:
+    """Print all passes to the terminal using rich formatting, grouped by satellite."""
     console.print()
     console.print("[bold cyan]Upcoming satellite passes — Chagrin Falls, OH[/bold cyan]")
     console.print(f"[dim]Showing passes with max elevation ≥ {min_elevation:.0f}°[/dim]")
@@ -185,7 +189,7 @@ def print_terminal(all_passes: list[dict], min_elevation: float) -> None:
 
     for name in seen_names:
         passes = by_sat[name]
-        freq   = passes[0]["frequency_mhz"]
+        freq = passes[0]["frequency_mhz"]
         console.print(f"\n[bold green]{name}[/bold green]  [dim]{freq} MHz[/dim]")
 
         for p in passes:
@@ -208,6 +212,7 @@ def print_terminal(all_passes: list[dict], min_elevation: float) -> None:
 
 
 def print_json(all_passes: list[dict]) -> None:
+    """Serialize all passes to JSON and print to stdout."""
     output = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "observer":  {"lat": OBSERVER_LAT, "lon": OBSERVER_LON},
@@ -219,20 +224,24 @@ def print_json(all_passes: list[dict]) -> None:
 # ── Crontab management ────────────────────────────────────────────────────────
 
 def get_crontab() -> str:
-    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    """Return the current crontab contents, or an empty string if none exists."""
+    result = subprocess.run(["crontab", "-l"], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         return ""
     return result.stdout
 
 
 def set_crontab(content: str) -> None:
-    proc = subprocess.run(["crontab", "-"], input=content, text=True, capture_output=True)
+    """Write content as the new crontab, exiting on failure."""
+    proc = subprocess.run(["crontab", "-"], input=content, text=True,
+                          capture_output=True, check=False)
     if proc.returncode != 0:
         console.print(f"[red]Failed to update crontab: {proc.stderr}[/red]")
         sys.exit(1)
 
 
 def strip_auto_generated(crontab: str) -> str:
+    """Remove the AUTO-GENERATED block from crontab text, returning the rest."""
     lines = crontab.splitlines()
     out = []
     inside = False
@@ -247,6 +256,7 @@ def strip_auto_generated(crontab: str) -> str:
 
 
 def schedule_pass(best_pass: dict) -> None:
+    """Write crontab entries to record the given satellite pass."""
     aos = datetime.fromisoformat(best_pass["aos"])
     los = datetime.fromisoformat(best_pass["los"])
     freq = best_pass["frequency_mhz"]
@@ -279,12 +289,16 @@ def schedule_pass(best_pass: dict) -> None:
     console.print(f"  Start: [cyan]{aos.strftime('%Y-%m-%d %H:%M')} UTC[/cyan]  ({start_cron})")
     console.print(f"  Stop:  [cyan]{los.strftime('%Y-%m-%d %H:%M')} UTC[/cyan]  ({stop_cron})")
     console.print(f"  Freq:  [yellow]{freq} MHz[/yellow]")
-    console.print(f"  Max elevation: [bright_green]{best_pass['max_elevation_deg']:.0f}°[/bright_green]\n")
+    console.print(
+        f"  Max elevation: [bright_green]{best_pass['max_elevation_deg']:.0f}°"
+        "[/bright_green]\n"
+    )
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return the CLI argument parser."""
     p = argparse.ArgumentParser(
         description="Predict satellite passes over Chagrin Falls, OH"
     )
@@ -304,6 +318,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """Entry point: parse args, predict passes, and display or schedule them."""
     args = build_parser().parse_args()
 
     sats = SATELLITES
@@ -330,7 +345,10 @@ def main() -> None:
 
     if args.schedule:
         if not all_passes:
-            console.print("[yellow]No passes found meeting the elevation threshold — crontab not updated.[/yellow]")
+            console.print(
+                "[yellow]No passes found meeting the elevation threshold"
+                " — crontab not updated.[/yellow]"
+            )
             return
         # Pick the pass with the highest max elevation as the "best"
         best = max(all_passes, key=lambda p: p["max_elevation_deg"])
