@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>Label</key>
+	<string>local.satellite.record-noaa19-0515-1553</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>/Users/billfordx/Documents/getSats/satellite-predictor/record_noaa.sh</string>
+		<string>137.100</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Day</key>
+		<integer>15</integer>
+		<key>Hour</key>
+		<integer>15</integer>
+		<key>Minute</key>
+		<integer>53</integer>
+		<key>Month</key>
+		<integer>5</integer>
+	</dict>
+</dict>
+</plist>
